@@ -8,8 +8,8 @@ const FALLBACK_DATA = {
     { id: "creditcard-w4", name: "Credit Card Payment", amount: 400, week: 4 }
   ],
   asNeededCategories: [
-    { id: "travel", name: "Traveling Expense", budget: 600 },
-    { id: "gas", name: "Gas Expense", budget: 400 }
+    { id: "travel", name: "Traveling Expense", amount: 600 },
+    { id: "gas", name: "Gas Expense", amount: 400 }
   ]
 };
 
@@ -24,7 +24,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { /* ignore corrupt state */ }
-  return { income: null, paid: {}, entries: {} };
+  return { income: null, paid: {} };
 }
 
 function saveState() {
@@ -44,9 +44,6 @@ async function loadBillsData() {
 function init() {
   loadBillsData().then((data) => {
     billsData = data;
-    data.asNeededCategories.forEach((cat) => {
-      if (!state.entries[cat.id]) state.entries[cat.id] = [];
-    });
 
     const incomeInput = document.getElementById("income");
     if (state.income != null) incomeInput.value = state.income;
@@ -57,10 +54,8 @@ function init() {
     });
 
     document.getElementById("resetMonthBtn").addEventListener("click", () => {
-      if (!confirm("Reset all paid checkmarks and as-needed expense entries for a new month?")) return;
+      if (!confirm("Reset all paid checkmarks for a new month?")) return;
       state.paid = {};
-      state.entries = {};
-      data.asNeededCategories.forEach((cat) => { state.entries[cat.id] = []; });
       saveState();
       renderWeeks();
       renderAsNeeded();
@@ -125,68 +120,37 @@ function renderAsNeeded() {
   const container = document.getElementById("asNeededContainer");
   container.innerHTML = "";
 
-  billsData.asNeededCategories.forEach((cat) => {
-    const entries = state.entries[cat.id] || [];
-    const spent = entries.reduce((sum, e) => sum + e.amount, 0);
-    const pct = cat.budget > 0 ? Math.min(100, (spent / cat.budget) * 100) : 0;
-    const over = spent > cat.budget;
+  const categories = billsData.asNeededCategories;
+  const card = document.createElement("div");
+  card.className = "week-card";
 
-    const card = document.createElement("div");
-    card.className = "as-needed-card";
+  const catTotal = categories.reduce((sum, c) => sum + c.amount, 0);
 
-    const entryRows = entries.length
-      ? entries.map((e) => `
-          <li class="entry-row" data-entry-id="${e.id}">
-            <span class="entry-desc">${e.desc || cat.name}</span>
-            <span class="entry-date">${e.date}</span>
-            <span class="entry-amount">${fmt(e.amount)}</span>
-            <button class="entry-remove" data-remove-id="${e.id}" title="Remove">&times;</button>
-          </li>`).join("")
-      : '<li class="empty-note">No expenses logged yet</li>';
+  const rowsHtml = categories.length
+    ? categories.map((cat) => {
+        const isPaid = !!state.paid[cat.id];
+        return `
+          <div class="bill-row ${isPaid ? "paid" : ""}" data-id="${cat.id}">
+            <input type="checkbox" ${isPaid ? "checked" : ""} data-bill-id="${cat.id}">
+            <div class="bill-info">
+              <span class="bill-name">${cat.name}</span>
+            </div>
+            <span class="bill-amount">${fmt(cat.amount)}</span>
+          </div>`;
+      }).join("")
+    : '<div class="empty-note">No as-needed expenses</div>';
 
-    card.innerHTML = `
-      <h2>${cat.name}</h2>
-      <div class="as-needed-budget">Budget ${fmt(cat.budget)} &middot; Spent ${fmt(spent)} ${over ? '<span style="color:var(--red)">(over budget)</span>' : ""}</div>
-      <div class="as-needed-progress"><div class="as-needed-progress-bar ${over ? "over" : ""}" style="width:${pct}%"></div></div>
-      <form class="entry-form" data-cat-id="${cat.id}">
-        <input type="text" placeholder="Description (optional)" class="entry-desc-input">
-        <input type="number" placeholder="Amount" step="0.01" min="0" class="entry-amount-input" required>
-        <button type="submit" class="btn btn-small">Add</button>
-      </form>
-      <ul class="entry-list">${entryRows}</ul>
-    `;
-    container.appendChild(card);
-  });
+  card.innerHTML = `
+    <h2>As Needed</h2>
+    <div class="week-total">Total: ${fmt(catTotal)}</div>
+    ${rowsHtml}
+  `;
+  container.appendChild(card);
 
-  container.querySelectorAll("form.entry-form").forEach((form) => {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const catId = form.getAttribute("data-cat-id");
-      const descInput = form.querySelector(".entry-desc-input");
-      const amountInput = form.querySelector(".entry-amount-input");
-      const amount = Number(amountInput.value);
-      if (!amount || amount <= 0) return;
-
-      const entry = {
-        id: "e" + Date.now() + Math.random().toString(16).slice(2),
-        desc: descInput.value.trim(),
-        amount: amount,
-        date: new Date().toISOString().slice(0, 10)
-      };
-      state.entries[catId] = state.entries[catId] || [];
-      state.entries[catId].push(entry);
-      saveState();
-      renderAsNeeded();
-      renderSummary();
-    });
-  });
-
-  container.querySelectorAll("button[data-remove-id]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const removeId = btn.getAttribute("data-remove-id");
-      Object.keys(state.entries).forEach((catId) => {
-        state.entries[catId] = state.entries[catId].filter((e) => e.id !== removeId);
-      });
+  container.querySelectorAll("input[data-bill-id]").forEach((cb) => {
+    cb.addEventListener("change", (e) => {
+      const id = e.target.getAttribute("data-bill-id");
+      state.paid[id] = e.target.checked;
       saveState();
       renderAsNeeded();
       renderSummary();
@@ -196,9 +160,7 @@ function renderAsNeeded() {
 
 function renderSummary() {
   const totalFixed = billsData.weeklyBills.reduce((sum, b) => sum + b.amount, 0);
-  const totalAsNeeded = Object.values(state.entries).reduce(
-    (sum, list) => sum + list.reduce((s, e) => s + e.amount, 0), 0
-  );
+  const totalAsNeeded = billsData.asNeededCategories.reduce((sum, c) => sum + c.amount, 0);
   const totalAll = totalFixed + totalAsNeeded;
   const income = state.income;
   const remaining = income != null ? income - totalAll : null;
