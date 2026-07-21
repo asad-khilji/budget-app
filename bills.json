@@ -7,7 +7,7 @@
     { "id": "creditcard-w4", "name": "Credit Card Payment", "amount": "", "week": 4 }
   ],
   "asNeededCategories": [
-    { "id": "travel", "name": "Traveling Expense", "amount": 600 },
+    { "id": "travel", "name": "Traveling Expense", "amount": 300 },
     { "id": "gas", "name": "Gas Expense", "amount": 400 }
   ]
 }
