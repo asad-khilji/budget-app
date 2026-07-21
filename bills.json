@@ -1,0 +1,13 @@
+{
+  "weeklyBills": [
+    { "id": "horizon-w1", "name": "Horizon Insurance", "amount": 800, "week": 1 },
+    { "id": "horizon-w2", "name": "Horizon Insurance", "amount": 800, "week": 2 },
+    { "id": "zakat-w3", "name": "Zakat", "amount": 500, "week": 3 },
+    { "id": "allowance-w3", "name": "Allowance", "amount": 100, "week": 3 },
+    { "id": "creditcard-w4", "name": "Credit Card Payment", "amount": 400, "week": 4 }
+  ],
+  "asNeededCategories": [
+    { "id": "travel", "name": "Traveling Expense", "budget": 600 },
+    { "id": "gas", "name": "Gas Expense", "budget": 400 }
+  ]
+}
